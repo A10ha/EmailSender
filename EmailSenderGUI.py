@@ -65,10 +65,11 @@ if not os.path.exists(log_path): os.mkdir(log_path)  # 若不存在logs文件夹
 class Log:
 
     def __init__(self):
-        self.__now_time_detail = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # 当前日期格式化
-        self.__now_time = datetime.now().strftime('%Y-%m-%d')
-        self.__all_log_path = os.path.join(log_path, self.__now_time + "-all" + ".log")  # 收集所有日志信息文件
-        self.__error_log_path = os.path.join(log_path, self.__now_time + "-error" + ".log")  # 收集错误日志信息文件
+        now_time = datetime.now().strftime('%Y-%m-%d')
+        self.__all_log_path = os.path.join(log_path, now_time + "-all" + ".log")  # 收集所有日志信息文件
+        self.__error_log_path = os.path.join(log_path, now_time + "-error" + ".log")  # 收集错误日志信息文件
+        self.__send_error_log_path = os.path.join(log_path, now_time + "-send_error" + ".log")  # 收集发送失败邮箱信息文件
+        self.__send_done_log_path = os.path.join(log_path, now_time + "-send_done" + ".log")  # 收集发送成功邮箱信息文件
 
     def SaveAllLog(self, message):
         with open(r"{}".format(self.__all_log_path), 'a+') as f:
@@ -81,28 +82,50 @@ class Log:
             f.write(message)
             f.write("\n")
         f.close()
+        
+    def SaveSendErrorLog(self, message):
+        with open(r"{}".format(self.__send_error_log_path), 'a+') as f:
+            f.write(message)
+            f.write("\n")
+        f.close()
+
+    def SaveSendDoneLog(self, message):
+        with open(r"{}".format(self.__send_done_log_path), 'a+') as f:
+            f.write(message)
+            f.write("\n")
+        f.close()
 
     def tips(self, message):
-        print(self.__now_time + (" [TIPS]: {}").format(message))
-        self.SaveAllLog(self.__now_time_detail + (" [TIPS]: {}").format(message))
+        now_time_detail = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(now_time_detail + ("[TIPS]: {}").format(message))
+        self.SaveAllLog(now_time_detail + (" [TIPS]: {}").format(message))
 
     def info(self, message):
-        print(self.__now_time + (" [INFO]: {}").format(message))
-        self.SaveAllLog(self.__now_time_detail + (" [INFO]: {}").format(message))
+        now_time_detail = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(now_time_detail + ("[INFO]: {}").format(message))
+        self.SaveAllLog(now_time_detail + (" [INFO]: {}").format(message))
 
     def warning(self, message):
-        print(self.__now_time + (" [WARNING]: {}").format(message))
-        self.SaveAllLog(self.__now_time_detail + (" [WARNING]: {}").format(message))
+        now_time_detail = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(now_time_detail + ("[WARNING]: {}").format(message))
+        self.SaveAllLog(now_time_detail + (" [WARNING]: {}").format(message))
 
     def error(self, message):
-        print(self.__now_time + (" [ERROR]: {}").format(message))
-        self.SaveAllLog(self.__now_time_detail + (" [ERROR]: {}").format(message))
-        self.SaveErrorLog(self.__now_time_detail + (" [ERROR]: {}").format(message))
+        now_time_detail = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(now_time_detail + ("[ERROR]: {}").format(message))
+        self.SaveAllLog(now_time_detail + (" [ERROR]: {}").format(message))
+        self.SaveErrorLog(now_time_detail + (" [ERROR]: {}").format(message))
 
     def done(self, message):
-        print(self.__now_time + (" [DONE]: {}").format(message))
-        self.SaveAllLog(self.__now_time_detail + (" [ERROR]: {}").format(message))
-
+        now_time_detail = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        print(now_time_detail + ("[DONE]: {}").format(message))
+        self.SaveAllLog(now_time_detail + (" [DONE]: {}").format(message))
+        
+    def send_done(self, message):
+        self.SaveSendDoneLog(("{}").format(message))
+        
+    def send_error(self, message):
+        self.SaveSendErrorLog(("{}").format(message))
 
 Log = Log()
 stop_flag = 0
@@ -247,22 +270,30 @@ class EmailSender:
                 client.sendmail(self.smtp_user, receivers, msg.as_string())  # 支持多个收件人，最多60个
                 client.quit()
                 Log.done('{:<30}\t邮件发送成功！'.format(rcptto[0]))
+                Log.send_done("{}".format(rcptto[0]))
                 send_index += 1
                 time.sleep(self.sleep)
             except smtplib.SMTPConnectError as e:
                 Log.error('邮件发送失败，连接失败: [Code]{}，[Error]{}'.format(e.smtp_code, e.smtp_error))
+                Log.send_error(rcptto[0])
             except smtplib.SMTPAuthenticationError as e:
                 Log.error('邮件发送失败，认证错误: [Code]{}，[Error]{}'.format(e.smtp_code, e.smtp_error))
+                Log.send_error(rcptto[0])
             except smtplib.SMTPSenderRefused as e:
                 Log.error('邮件发送失败，发件人被拒绝: [Code]{}，[Error]{}'.format(e.smtp_code, e.smtp_error))
+                Log.send_error(rcptto[0])
             except smtplib.SMTPRecipientsRefused as e:
                 Log.error('邮件发送失败，收件人被拒绝: [Error]{}'.format(e))
+                Log.send_error(rcptto[0])
             except smtplib.SMTPDataError as e:
                 Log.error('邮件发送失败，数据接收拒绝:[Code]{}，[Error]{}'.format(e.smtp_code, e.smtp_error))
+                Log.send_error(rcptto[0])
             except smtplib.SMTPException as e:
                 Log.error('邮件发送失败, {}'.format(str(e)))
+                Log.send_error(rcptto[0])
             except Exception as e:
                 Log.error('邮件发送异常, {}'.format(str(e)))
+                Log.send_error(rcptto[0])
 
 
 def read_mail(path):
@@ -549,7 +580,7 @@ class EmailSenderGUI():
 
     def HTMLReader(self, eml_file):
         self.email_editor_text.delete('1.0', 'end')
-        Log.tips("============================================================")
+        Log.tips("================================================")
         HTML_content = emailInfo(eml_file)
         self.email_editor_text.insert(tkinter.INSERT, HTML_content)
         with open('temp.html', 'wb') as f:
