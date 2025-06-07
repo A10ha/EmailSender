@@ -46,3 +46,4 @@
 
 # 本项目是仅为个人研究练习开发，禁止用于非法活动。 
 # 项目开发者对软件的滥用不承担任何责任。 由使用者负责。
+This Project Is Licensed Under The [MIT License](LICENSE)
